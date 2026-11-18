@@ -23,7 +23,10 @@
           <button id="view-single" aria-pressed="false">Single route</button>
         </div>
         <label class="single-only">ALGORITHM <select id="solver" disabled></select></label>
+        <label class="single-only">SPEED <select id="replay-speed"><option value="slow" selected>Slow</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label>
         <div class="playback">
+          <button id="step-back" class="single-only" disabled aria-label="Previous step" title="Previous step">&#9664;</button>
+          <button id="step-forward" class="single-only" disabled aria-label="Next step" title="Next step">&#9654;</button>
           <button id="pause" disabled>Pause</button>
           <button id="play" class="primary" disabled>Replay race</button>
         </div>
@@ -36,7 +39,8 @@
       <div class="map-wrap single-only">
         <canvas id="map" width="1000" height="760" aria-label="Delivery route map"></canvas>
         <div id="city-detail" class="city-detail" hidden></div>
-        <div class="map-key"><span><i class="key-route"></i> Selected route</span><span><i class="key-depot"></i> Depot</span></div>
+        <div id="step-badge" class="step-badge" hidden aria-hidden="true"></div>
+        <div class="map-key"><span><i class="key-route"></i> Selected route</span><span><i class="key-depot"></i> Depot</span><span><i class="key-added"></i> Added this step</span><span><i class="key-removed"></i> Removed this step</span></div>
         <span class="map-note">Schematic map / straight-line distances</span>
       </div>
       <div class="replay-bar">
@@ -59,8 +63,8 @@
         <p class="eyebrow">SELECTED ALGORITHM</p>
         <h2 id="selected-solver">No route yet</h2>
         <div class="distance"><span id="distance">--</span> <span id="units"></span></div>
-        <p class="hint">Total round-trip distance</p>
-        <div class="metrics"><div><span>COMPUTE TIME</span><strong id="compute-time">--</strong></div><div><span>REPORTED ROUTES</span><strong id="improvements">--</strong></div></div>
+        <p class="hint" id="distance-hint">Total round-trip distance</p>
+        <div class="metrics"><div><span>COMPUTE TIME</span><strong id="compute-time">--</strong></div><div><span>REPORTED ROUTES</span><strong id="improvements">--</strong></div><div><span>REPLAY STEP</span><strong id="replay-step">--</strong></div></div>
       </section>
       <section class="ranking single-only">
         <div class="section-heading"><h2>Leaderboard</h2><span>SHORTEST WINS</span></div>

@@ -1,6 +1,7 @@
 import { createScene, buildTour, truckAt, LANDMARKS } from './scene.js';
 import { createRaceView } from './race-view.js';
 import { visibleRaceEntries } from './race.js';
+import { REPLAY_SPEEDS, replaySteps } from './replay.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('map');
@@ -9,10 +10,14 @@ const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const regionNames = { 'uk-30': 'United Kingdom', 'nl-30': 'Netherlands', berlin52: 'Berlin / 52 stops',
   'random-100': 'Random / 100 stops', 'clustered-200': 'Clusters / 200 stops' };
 let dataset = null, result = null, scene = null, tour = null;
-let animation = null, elapsed = 0, lastTime = null, paused = false, playing = false;
+let animation = null, lastTime = null, paused = false, playing = false;
 let currentRoute = null, position = null, visited = 0, requestVersion = 0;
 let view = 'race', allResults = new Map();
+// Single-route replay: one step per recorded route, then the delivery preview.
+let steps = [], stepIndex = 0, stepClock = 0, driveClock = 0, phase = 'drive';
 const previewMs = 20000;
+const fmt = d => d.toLocaleString(undefined, { maximumFractionDigits: 1 });
+const unitLabel = () => dataset?.units ?? (dataset?.distance === 'haversine' ? 'km' : 'units');
 
 async function getJson(url, optional = false) {
   const response = await fetch(url);
@@ -60,6 +65,7 @@ function setView(next) {
   $('play').textContent = view === 'race' ? 'Replay race' : 'Replay route';
   stop();
   race.setActive(view === 'race');
+  updateStepButtons();
   if (view === 'race') {
     $('play').disabled = !dataset || !race.count;
     race.replay();
@@ -103,43 +109,116 @@ function resize() {
   if (!dataset) return;
   scene = createScene(ctx, dataset.cities, width, height, dataset.name);
   scene.setRoute(result?.status === 'ok' ? result.route : null);
-  tour = buildTour(currentRoute, scene.points);
-  position = truckAt(tour, Math.max(0, (elapsed - optimizationMs()) / previewMs));
-  scene.draw(currentRoute, position, visited);
+  tour = null;
+  drawSingle();
 }
 
-function optimizationMs() {
-  return result?.progress?.length ? Math.min(3200, result.progress.length * 180) : 0;
+const stepMs = () => REPLAY_SPEEDS[$('replay-speed').value] ?? REPLAY_SPEEDS.slow;
+
+function drawSingle() {
+  if (!scene) return;
+  const step = phase === 'search' ? steps[stepIndex] : null;
+  const route = step ? step.route : result?.status === 'ok' ? result.route : null;
+  if (route !== currentRoute || !tour) {
+    currentRoute = route;
+    tour = buildTour(route, scene.points);
+  }
+  const fraction = phase === 'drive' ? Math.min(1, driveClock / previewMs) : 0;
+  position = truckAt(tour, fraction);
+  visited = phase === 'drive' ? position?.stops ?? 0 : 0;
+  let highlight = null;
+  if (step) {
+    const fade = paused || !playing || reducedMotion.matches ? 1 : 1 - .6 * Math.min(1, stepClock / stepMs());
+    highlight = { added: step.added, removed: step.removed, alpha: fade,
+      color: step.kind === 'building' ? '#418d78' : step.kind === 'no-change' ? '#4f6fb3' : '#dda547' };
+  }
+  scene.draw(currentRoute, position, visited, highlight);
+}
+
+const STEP_LABELS = { building: 'Building route', first: 'First complete route', improved: 'New best', 'no-change': 'No improvement' };
+
+function showStep() {
+  const step = steps[stepIndex], n = dataset.cities.length, units = unitLabel();
+  const badge = $('step-badge');
+  badge.hidden = false;
+  badge.classList.toggle('improved', step.kind === 'improved' || step.kind === 'first');
+  let detail = `${step.route.length} of ${n} stops`;
+  if (step.kind === 'improved') {
+    const pct = step.delta / step.previousBest * 100;
+    detail = `${fmt(step.distance)} ${units} / ${fmt(step.delta)} ${units} shorter (-${pct.toFixed(pct < .1 ? 2 : 1)}%)`;
+  } else if (step.kind !== 'building') detail = `${fmt(step.distance)} ${units}`;
+  const title = document.createElement('strong');
+  title.textContent = STEP_LABELS[step.kind].toUpperCase();
+  badge.replaceChildren(title, `Step ${stepIndex + 1} of ${steps.length} / ${detail}`);
+  badge.classList.remove('pop');
+  if (step.kind === 'improved' || step.kind === 'first') {
+    void badge.offsetWidth;
+    badge.classList.add('pop');
+  }
+  $('distance').textContent = step.best != null ? fmt(step.best) : '--';
+  $('distance-hint').textContent = step.best != null ? `Best so far at step ${stepIndex + 1}` : 'No complete route yet';
+  $('replay-step').textContent = `${stepIndex + 1} / ${steps.length}`;
+  setBar((stepIndex + 1) / steps.length, STEP_LABELS[step.kind], `Step ${stepIndex + 1} of ${steps.length} / ${step.t} ms compute`);
+  updateStepButtons();
+}
+
+function enterDrive() {
+  phase = 'drive';
+  driveClock = 0;
+  $('step-badge').hidden = true;
+  updateSummary();
+  setProgress(0, 'Delivery preview', 0);
+}
+
+function updateStepButtons() {
+  const usable = view === 'single' && steps.length > 0;
+  $('step-back').disabled = !usable || (phase === 'search' && stepIndex === 0);
+  $('step-forward').disabled = !usable || phase === 'drive';
+}
+
+function step(delta) {
+  if (view !== 'single' || !steps.length || !scene) return;
+  cancelAnimationFrame(animation);
+  animation = null;
+  lastTime = null;
+  playing = true;
+  paused = true;
+  $('pause').disabled = false;
+  $('pause').textContent = 'Resume';
+  if (phase === 'drive') {
+    if (delta > 0) return;
+    phase = 'search';
+    stepIndex = steps.length - 1;
+  } else if (delta > 0 && stepIndex === steps.length - 1) {
+    enterDrive();
+  } else stepIndex = Math.max(0, Math.min(steps.length - 1, stepIndex + delta));
+  stepClock = 0;
+  if (phase === 'search') {
+    showStep();
+    const s = steps[stepIndex];
+    status(`Step ${stepIndex + 1} of ${steps.length}: ${STEP_LABELS[s.kind].toLowerCase()}${s.best != null ? `, best so far ${fmt(s.best)} ${unitLabel()}` : ''}.`);
+  }
+  updateStepButtons();
+  drawSingle();
 }
 
 function render(time) {
   if (!playing || paused || !scene) return;
-  if (lastTime != null) elapsed += Math.min(time - lastTime, 100);
+  const dt = lastTime == null ? 0 : Math.min(time - lastTime, 100);
   lastTime = time;
-  const optimize = optimizationMs();
-  if (elapsed < optimize) {
-    const frames = result.progress;
-    const index = Math.min(frames.length - 1, Math.floor(elapsed / optimize * frames.length));
-    const frame = frames[index];
-    if (currentRoute !== frame.route) {
-      currentRoute = frame.route;
-      tour = buildTour(currentRoute, scene.points);
+  if (phase === 'search') {
+    stepClock += dt;
+    if (stepClock >= stepMs()) {
+      stepClock = 0;
+      if (stepIndex < steps.length - 1) { stepIndex++; showStep(); } else { enterDrive(); updateStepButtons(); }
     }
-    position = truckAt(tour, 0);
-    visited = 0;
-    setProgress(0, 'Finding a shorter tour', 0);
-  } else {
-    if (currentRoute !== result.route) {
-      currentRoute = result.route;
-      tour = buildTour(currentRoute, scene.points);
-    }
-    const fraction = Math.min(1, (elapsed - optimize) / previewMs);
-    position = truckAt(tour, fraction);
-    visited = position?.stops ?? 0;
+  } else driveClock += dt;
+  drawSingle();
+  if (phase === 'drive') {
+    const fraction = Math.min(1, driveClock / previewMs);
     setProgress(fraction, fraction === 1 ? 'Back at the depot' : 'Delivery preview', visited);
-    if (fraction === 1) stop();
+    if (fraction === 1) { stop(); updateStepButtons(); return; }
   }
-  scene.draw(currentRoute, position, visited);
   if (playing) animation = requestAnimationFrame(render);
 }
 
@@ -147,20 +226,29 @@ function replay() {
   stop();
   if (view === 'race') { race.replay(); return; }
   if (!scene) return;
-  elapsed = 0;
-  visited = 0;
-  currentRoute = result?.status === 'ok' ? result.route : null;
-  scene.setRoute(currentRoute);
-  tour = buildTour(currentRoute, scene.points);
-  position = truckAt(tour, 0);
-  scene.draw(currentRoute, position, 0);
-  setProgress(0, currentRoute ? 'Delivery preview' : 'Waiting for a route', 0);
-  if (!currentRoute) return;
-  status(`${result.solver}: ${result.progress?.length ?? 0} reported routes. Preview is illustrative, not road navigation.`);
+  const ok = result?.status === 'ok';
+  steps = ok ? replaySteps(result, dataset.cities.length) : [];
+  stepIndex = 0;
+  stepClock = 0;
+  driveClock = 0;
+  phase = 'drive';
+  $('step-badge').hidden = true;
+  updateSummary();
+  updateStepButtons();
+  drawSingle();
+  setProgress(0, ok ? 'Delivery preview' : 'Waiting for a route', 0);
+  if (!ok) return;
+  const improvements = steps.filter(s => s.kind === 'improved').length;
+  status(`${result.solver}: ${steps.length} recorded steps, ${improvements} of them new bests. Gold edges were added in the step, dashed red edges were removed. Use the arrows to step through.`);
   if (reducedMotion.matches) {
     $('phase').textContent = 'Final tour';
-    status('Reduced motion is enabled. Showing the final tour without animation.');
+    status(`Reduced motion is enabled. Showing the final tour; use the arrows to step through ${steps.length} recorded steps.`);
     return;
+  }
+  if (steps.length) {
+    phase = 'search';
+    showStep();
+    drawSingle();
   }
   playing = true;
   $('pause').disabled = false;
@@ -171,9 +259,11 @@ function updateSummary() {
   const ok = result?.status === 'ok';
   $('selected-solver').textContent = result?.solver ?? 'No route yet';
   $('distance').textContent = ok ? result.distance.toLocaleString(undefined, { maximumFractionDigits: 1 }) : '--';
-  $('units').textContent = dataset?.units ?? (dataset?.distance === 'haversine' ? 'km' : 'units');
+  $('units').textContent = unitLabel();
+  $('distance-hint').textContent = 'Total round-trip distance';
   $('compute-time').textContent = ok && result.ms != null ? `${result.ms} ms` : '--';
   $('improvements').textContent = ok ? result.progress?.length ?? 0 : '--';
+  $('replay-step').textContent = steps.length ? `${steps.length} / ${steps.length}` : '--';
   $('play').disabled = view === 'race' ? !dataset || !race.count : !ok;
   document.querySelectorAll('#leaderboard tbody tr').forEach(row => row.classList.toggle('selected', row.dataset.solver === $('solver').value));
 }
@@ -240,6 +330,9 @@ async function selectDataset() {
   $('solver').disabled = true;
   $('play').disabled = true;
   $('city-detail').hidden = true;
+  $('step-badge').hidden = true;
+  steps = [];
+  updateStepButtons();
   setProgress(0, 'Loading region', 0);
   status('Loading region...');
   try {
@@ -253,7 +346,8 @@ async function selectDataset() {
     $('city-count').textContent = `${dataset.cities.length} cities`;
     $('race-command').textContent = `npm run race -- --dataset data/${name}.json`;
     canvas.setAttribute('aria-label', `${$('region').textContent}: ${dataset.cities.map(c => c.name ?? `City ${c.id}`).join(', ')}. Route roads are schematic.`);
-    elapsed = 0;
+    steps = [];
+    phase = 'drive';
     visited = 0;
     resize();
     const [solvers, leaderboard] = await Promise.all([
@@ -318,9 +412,11 @@ $('pause').onclick = () => {
   }
   paused = !paused;
   $('pause').textContent = paused ? 'Resume' : 'Pause';
-  if (paused) cancelAnimationFrame(animation);
+  if (paused) { cancelAnimationFrame(animation); drawSingle(); }
   else { lastTime = null; animation = requestAnimationFrame(render); }
 };
+$('step-back').onclick = () => step(-1);
+$('step-forward').onclick = () => step(1);
 reducedMotion.addEventListener('change', () => { if (dataset) replay(); });
 document.addEventListener('visibilitychange', () => { lastTime = null; race.resetClock(); });
 // WebKit frees canvas memory lazily across reloads; release it eagerly when leaving the page.

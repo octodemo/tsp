@@ -19,7 +19,7 @@ h1 { margin: 0; font-size: 22px; letter-spacing: -.8px; }
 .workshop-tag { border: 1px solid var(--line); border-radius: 20px; padding: 8px 12px; }
 main { max-width: 1600px; margin: auto; display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 24px; padding: 28px 4%; }
 .workspace { min-width: 0; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--panel); }
-.toolbar { display: flex; align-items: end; gap: 16px; padding: 18px 22px; border-bottom: 1px solid var(--line); }
+.toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; padding: 18px 22px; border-bottom: 1px solid var(--line); }
 label { display: grid; gap: 6px; font-size: 9px; letter-spacing: 1.2px; font-weight: 700; color: var(--muted); min-width: 0; }
 select, button { font: inherit; font-size: 12px; letter-spacing: 0; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; color: var(--fg); background: white; }
 select { max-width: 210px; width: 100%; }
@@ -50,6 +50,18 @@ canvas { display: block; width: 100%; height: clamp(530px, 52vw, 740px); }
 .map-key span { display: flex; align-items: center; gap: 6px; }
 .key-route { width: 18px; border-top: 3px solid var(--accent); }
 .key-depot { width: 7px; height: 7px; border-radius: 50%; background: #c78036; outline: 3px solid #f9e5c8; }
+.key-added { width: 18px; border-top: 4px solid #dda547; }
+.key-removed { width: 18px; border-top: 2px dashed #c4553f; }
+.step-badge { position: absolute; top: 16px; right: 16px; display: grid; gap: 2px; padding: 10px 14px; border-radius: 10px; background: #ffffffe8; border: 1px solid var(--line); font-size: 11px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; pointer-events: none; box-shadow: 0 3px 12px #283b3910; }
+.step-badge strong { font-size: 13px; color: var(--fg); letter-spacing: .5px; }
+.step-badge.improved { background: #fbf2de; border-color: #dda547; box-shadow: 0 0 0 3px #f2d79c; }
+.step-badge.improved strong { color: #7a5317; }
+.step-badge.pop { animation: badge-pop .6s ease-out; }
+@keyframes badge-pop { 0% { transform: scale(.85); opacity: .2; } 60% { transform: scale(1.06); opacity: 1; } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .step-badge.pop { animation: none; } }
+#step-back, #step-forward { padding: 0 12px; font-size: 10px; }
+#dataset, #solver { min-width: 140px; }
+#replay-speed { min-width: 96px; }
 .map-note { position: absolute; bottom: 15px; right: 18px; font-size: 9px; color: #718071; pointer-events: none; }
 .city-detail { position: absolute; left: 16px; top: 16px; max-width: calc(100% - 32px); padding: 10px 14px; background: #fff; border: 1px solid var(--line); border-radius: 8px; font-size: 12px; pointer-events: none; box-shadow: 0 3px 12px #283b3910; }
 .replay-bar { display: flex; align-items: center; gap: 14px; padding: 17px 24px 0; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
