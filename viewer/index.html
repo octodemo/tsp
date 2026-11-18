@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TSP Route Race</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="view-race">
+  <header>
+    <a class="brand" href="./" aria-label="TSP Route Race home">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="4" y="10" width="21" height="18" rx="3"/><path d="M25 16h7l5 7v5H25z"/><circle cx="12" cy="30" r="4"/><circle cx="30" cy="30" r="4"/></svg>
+      <div><h1>Route Race</h1><span>The travelling salesman, on wheels.</span></div>
+    </a>
+    <span class="workshop-tag">TSP WORKSHOP</span>
+  </header>
+  <main>
+    <section class="workspace" aria-label="Route viewer">
+      <div class="toolbar">
+        <label>REGION <select id="dataset" disabled></select></label>
+        <div class="view-toggle" role="group" aria-label="View">
+          <button id="view-race" aria-pressed="true">Race / all maps</button>
+          <button id="view-single" aria-pressed="false">Single route</button>
+        </div>
+        <label class="single-only">ALGORITHM <select id="solver" disabled></select></label>
+        <div class="playback">
+          <button id="pause" disabled>Pause</button>
+          <button id="play" class="primary" disabled>Replay race</button>
+        </div>
+      </div>
+      <div class="map-heading">
+        <div><p class="eyebrow">THE DELIVERY MAP</p><h2 id="region">Loading cities...</h2></div>
+        <span class="map-badge"><i></i> <span id="city-count">Cities</span></span>
+      </div>
+      <div id="race-grid" class="race-grid race-only" aria-label="One map per algorithm"></div>
+      <div class="map-wrap single-only">
+        <canvas id="map" width="1000" height="760" aria-label="Delivery route map"></canvas>
+        <div id="city-detail" class="city-detail" hidden></div>
+        <div class="map-key"><span><i class="key-route"></i> Selected route</span><span><i class="key-depot"></i> Depot</span></div>
+        <span class="map-note">Schematic map / straight-line distances</span>
+      </div>
+      <div class="replay-bar">
+        <span id="phase">Ready to explore</span>
+        <div class="progress-track" role="progressbar" aria-label="Delivery preview" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="progress"></div></div>
+        <span id="stops">0 stops</span>
+      </div>
+      <p id="status" role="status" aria-live="polite">Loading datasets...</p>
+    </section>
+    <aside aria-label="Race results">
+      <section class="race-only live-board">
+        <div class="section-heading"><h2>Live leaderboard</h2><span>SHORTEST WINS</span></div>
+        <div class="table-wrap"><table id="race-board"><thead><tr><th scope="col">#</th><th scope="col">Algorithm</th><th scope="col">Distance</th><th scope="col">Status</th></tr></thead><tbody></tbody></table></div>
+      </section>
+      <section class="race-only">
+        <div class="section-heading"><h2>Distance over time</h2><span>LOWER IS BETTER</span></div>
+        <canvas id="race-chart" class="race-chart" aria-label="Best distance against compute time for each algorithm"></canvas>
+      </section>
+      <section class="summary single-only">
+        <p class="eyebrow">SELECTED ALGORITHM</p>
+        <h2 id="selected-solver">No route yet</h2>
+        <div class="distance"><span id="distance">--</span> <span id="units"></span></div>
+        <p class="hint">Total round-trip distance</p>
+        <div class="metrics"><div><span>COMPUTE TIME</span><strong id="compute-time">--</strong></div><div><span>REPORTED ROUTES</span><strong id="improvements">--</strong></div></div>
+      </section>
+      <section class="ranking single-only">
+        <div class="section-heading"><h2>Leaderboard</h2><span>SHORTEST WINS</span></div>
+        <div class="table-wrap"><table id="leaderboard"><thead><tr><th scope="col">#</th><th scope="col">Algorithm</th><th scope="col">Distance</th><th scope="col">Time</th></tr></thead><tbody></tbody></table></div>
+        <p id="leaderboard-empty" class="hint">No race results for this region yet.</p>
+      </section>
+      <section class="guide">
+        <h2>A small truck. A big problem.</h2>
+        <p>Visit every city and return to the depot. Each algorithm finds a different way around.</p>
+        <p>Each implemented algorithm in the latest race gets its own map. The search is replayed together, then all trucks leave at once at the same speed, so the shortest tour gets home first.</p>
+        <div class="run-race">
+          <label>TIME PER ALGORITHM <select id="race-time"><option value="2000">2 s</option><option value="5000" selected>5 s</option><option value="10000">10 s</option></select></label>
+          <button id="run-race" class="primary">Run race</button>
+        </div>
+        <p class="hint">Or run it in a terminal, then refresh:</p>
+        <code id="race-command">npm run race -- --dataset data/uk-30.json</code>
+      </section>
+    </aside>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "tsp-route-race",
+  "version": "1.0.0",
+  "description": "Travelling Salesman 'Route Race' workshop starter for the GitHub Copilot app",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "generate": "node scripts/generate.js",
+    "race": "node scripts/race.js",
+    "score": "node scripts/score.js",
+    "serve": "node scripts/serve.js",
+    "test": "node --test"
+  }
+}
