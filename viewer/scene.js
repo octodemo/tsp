@@ -285,7 +285,8 @@ export function createScene(ctx, cities, width, height, region, { accent = '#418
       background.width = background.height = 0;
       backgrounds.delete(ctx.canvas);
     },
-    draw(route, position, visited = 0) {
+    // highlight: { added: [[a, b]], removed: [[a, b]], color, alpha } marks the edges a replay step changed.
+    draw(route, position, visited = 0, highlight = null) {
       if (!fixedLabels) setRoute(route);
       ctx.clearRect(0, 0, width, height);
       ctx.drawImage(background, 0, 0, width, height);
@@ -306,6 +307,18 @@ export function createScene(ctx, cities, width, height, region, { accent = '#418
           ctx.lineTo(position.x, position.y);
           ctx.strokeStyle = accent; ctx.lineWidth = 3; ctx.stroke();
         }
+      }
+      if (highlight && (highlight.added?.length || highlight.removed?.length)) {
+        const segment = ([a, b]) => { ctx.moveTo(points[a].x, points[a].y); ctx.lineTo(points[b].x, points[b].y); };
+        ctx.save();
+        ctx.globalAlpha = highlight.alpha ?? 1;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); highlight.removed?.forEach(segment);
+        ctx.strokeStyle = '#c4553f'; ctx.lineWidth = 2.5; ctx.setLineDash([5, 6]); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); highlight.added?.forEach(segment);
+        ctx.strokeStyle = `${highlight.color ?? '#dda547'}66`; ctx.lineWidth = 14; ctx.stroke();
+        ctx.strokeStyle = highlight.color ?? '#dda547'; ctx.lineWidth = 5; ctx.stroke();
+        ctx.restore();
       }
       points.forEach((p, i) => {
         const depot = i === (route?.[0] ?? 0);
